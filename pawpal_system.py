@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from itertools import combinations
 from typing import Optional
 
 PRIORITY_LEVELS = {"low": 1, "medium": 2, "high": 3}
@@ -222,9 +223,10 @@ class Scheduler:
 
         # 3. Overlapping time windows in the scheduled plan
         # Only tasks that have a scheduled_time can be compared.
+        # itertools.combinations(timed, 2) yields each unique pair once —
+        # cleaner than a manual index-guard nested loop.
         timed = [t for t in self.scheduled_tasks if t.scheduled_time is not None]
-        for i, a in enumerate(timed):
-            for b in timed[i + 1:]:
+        for a, b in combinations(timed, 2):
                 start_a = self._to_minutes(a.scheduled_time)
                 start_b = self._to_minutes(b.scheduled_time)
                 end_a = start_a + a.duration_minutes
@@ -248,7 +250,7 @@ class Scheduler:
         """
         return sorted(
             self.scheduled_tasks,
-            key=lambda t: t.scheduled_time if t.scheduled_time is not None else "99:99",
+            key=lambda t: t.scheduled_time or "99:99",
         )
 
     def get_skipped_tasks(self) -> list[Task]:

@@ -12,6 +12,8 @@
 
 3. **Generate and view a daily schedule** — A user requests a daily plan and the app arranges tasks within the available time window based on priority and constraints, then displays the ordered schedule along with an explanation of why each task was included or left out.
 
+
+
 The initial design uses four classes. `Owner` holds the pet owner's name, daily time budget, and care preferences — it is the source of the constraint that the scheduler works within. `Pet` holds profile info (name, species, age) that describes who is being cared for. `Task` represents a single care activity and carries the title, duration, priority, category, and completion status needed to make scheduling decisions. `Scheduler` is the core logic class: it holds the owner, the pet, and the full task list, then produces two output lists — scheduled tasks that fit within the time budget and skipped tasks that did not — along with a plain-language explanation of the plan.
 
 **b. Design changes**
@@ -29,8 +31,9 @@ After reviewing the skeleton, three changes were made. First, `Pet.owner` was re
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+The scheduler uses a greedy algorithm: it sorts tasks by frequency, then priority, then duration, and fills the time budget from the top of that list until no more tasks fit. This is simple and fast but does not guarantee the optimal set of tasks. For example, the scheduler might pick three short high-priority tasks that together consume 55 minutes, leaving only 5 minutes — not enough for a 10-minute medium-priority task that would have fit if one of the shorter tasks had been swapped out. A true optimal solution would use dynamic programming (the 0/1 knapsack algorithm), which evaluates all possible combinations to find the highest-value set that fits within the budget.
+
+The greedy approach is a reasonable tradeoff here because a pet care app typically has a small number of tasks (under 20), so the difference between greedy and optimal is unlikely to matter in practice. More importantly, the greedy approach is transparent — a pet owner can read the priority order and predict exactly which tasks will be chosen, which builds trust in the app. An optimal knapsack solution would be harder to explain and harder for a non-technical user to reason about.
 
 ---
 
