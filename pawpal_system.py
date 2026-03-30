@@ -15,6 +15,7 @@ class Task:
     category: str        # "walk", "feed", "meds", "grooming", "enrichment"
     frequency: str       # "daily", "weekly", "as-needed"
     completed: bool = False
+    scheduled_time: str | None = None  # optional preferred start time "HH:MM"
 
     def mark_complete(self) -> None:
         """Mark this task as completed."""
@@ -165,6 +166,19 @@ class Scheduler:
             )
 
         return warnings
+
+    def sort_by_time(self) -> list[Task]:
+        """
+        Return scheduled tasks ordered by their preferred start time (HH:MM).
+
+        "HH:MM" strings are zero-padded, so lexicographic order equals
+        chronological order — no parsing required.
+        Tasks without a scheduled_time sort to the end ("99:99" sentinel).
+        """
+        return sorted(
+            self.scheduled_tasks,
+            key=lambda t: t.scheduled_time if t.scheduled_time is not None else "99:99",
+        )
 
     def get_skipped_tasks(self) -> list[Task]:
         """Return tasks that did not fit within the available time budget."""
