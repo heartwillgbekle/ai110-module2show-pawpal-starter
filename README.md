@@ -39,6 +39,35 @@ The scheduling logic in `pawpal_system.py` goes beyond a simple list of tasks. F
 
 **Recurring tasks** — Calling `Pet.complete_task(title)` marks a task done and automatically appends the next occurrence to the pet's task list. Daily tasks recur tomorrow (`timedelta(days=1)`), weekly tasks recur in seven days (`timedelta(days=7)`), and as-needed tasks do not recur.
 
+## Testing PawPal+
+
+### Run the tests
+
+```bash
+python -m pytest
+# or for verbose output
+python -m pytest -v
+```
+
+### What the tests cover
+
+The suite in `tests/test_pawpal.py` contains **21 tests** across five areas:
+
+| Area | Tests | Description |
+|---|---|---|
+| Task basics | 2 | `mark_complete()` flips status; `add_task()` increments count |
+| Scheduler — happy paths | 5 | Time budget respected; daily before weekly; high priority before low; exact budget fill; over-budget task skipped |
+| Scheduler — edge cases | 3 | Pet with no tasks; owner with no pets; all tasks already completed |
+| Recurring tasks | 5 | Daily recurs tomorrow; weekly recurs in 7 days; as-needed returns None; `complete_task()` appends next occurrence; as-needed does not append |
+| Conflict detection | 4 | Same start time flagged; overlapping windows flagged; touching (non-overlapping) not flagged; duplicate title warned |
+| Sorting | 2 | `sort_by_time()` returns chronological order; tasks without a time sort last |
+
+### Confidence level
+
+⭐⭐⭐⭐ (4/5)
+
+The core scheduling logic — budget enforcement, priority/frequency ordering, recurrence, and conflict detection — is thoroughly covered by tests that include both happy paths and targeted edge cases. The remaining gap is integration-level coverage: the Streamlit UI wiring in `app.py` and multi-pet filter combinations are tested manually but not yet in the automated suite.
+
 ## Getting started
 
 ### Setup
