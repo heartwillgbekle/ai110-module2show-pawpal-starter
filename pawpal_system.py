@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from typing import Optional
 
 PRIORITY_LEVELS = {"low": 1, "medium": 2, "high": 3}
@@ -16,6 +17,7 @@ class Task:
     frequency: str       # "daily", "weekly", "as-needed"
     completed: bool = False
     scheduled_time: str | None = None  # optional preferred start time "HH:MM"
+    due_date: date | None = None       # date this task is due; None means unscheduled
 
     def mark_complete(self) -> None:
         """Mark this task as completed."""
@@ -24,6 +26,32 @@ class Task:
     def is_high_priority(self) -> bool:
         """Return True if the task's priority is high."""
         return self.priority == "high"
+
+    def next_occurrence(self) -> "Task | None":
+        """
+        Return a new incomplete copy of this task due on its next occurrence date.
+
+        - daily   → due_date + 1 day  (timedelta(days=1))
+        - weekly  → due_date + 7 days (timedelta(days=7))
+        - as-needed → None (no automatic recurrence)
+
+        The base date is today when due_date is not set.
+        """
+        deltas = {"daily": timedelta(days=1), "weekly": timedelta(days=7)}
+        delta = deltas.get(self.frequency)
+        if delta is None:
+            return None
+        base = self.due_date if self.due_date is not None else date.today()
+        return Task(
+            title=self.title,
+            duration_minutes=self.duration_minutes,
+            priority=self.priority,
+            category=self.category,
+            frequency=self.frequency,
+            completed=False,
+            scheduled_time=self.scheduled_time,
+            due_date=base + delta,
+        )
 
 
 @dataclass
@@ -44,6 +72,22 @@ class Pet:
     def get_tasks(self) -> list[Task]:
         """Return the pet's full task list."""
         return self.tasks
+
+    def complete_task(self, title: str) -> "Task | None":
+        """
+        Mark the first incomplete task matching title as done.
+        If the task recurs (daily/weekly), append the next occurrence to this
+        pet's task list automatically and return it.
+        Returns None for as-needed tasks or when no match is found.
+        """
+        for task in self.tasks:
+            if task.title == title and not task.completed:
+                task.mark_complete()
+                next_task = task.next_occurrence()
+                if next_task is not None:
+                    self.tasks.append(next_task)
+                return next_task
+        return None
 
     def get_profile(self) -> str:
         """Return a one-line summary of the pet's profile and task count."""
@@ -145,10 +189,13 @@ class Scheduler:
         """
         warnings: list[str] = []
 
-        # 1. Duplicate task titles per pet
+        # 1. Duplicate task titles among INCOMPLETE tasks per pet
+        # (a completed task alongside its auto-created next occurrence is normal)
         for pet in self.owner.pets:
             seen: set[str] = set()
             for task in pet.get_tasks():
+                if task.completed:
+                    continue
                 if task.title in seen:
                     warnings.append(
                         f"Conflict: '{task.title}' is listed more than once for {pet.name}."
