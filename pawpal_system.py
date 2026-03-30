@@ -3,6 +3,9 @@ from typing import Optional
 
 PRIORITY_LEVELS = {"low": 1, "medium": 2, "high": 3}
 
+# Lower number = scheduled earlier. daily tasks always come before weekly/as-needed.
+FREQUENCY_ORDER = {"daily": 0, "weekly": 1, "as-needed": 2}
+
 
 @dataclass
 class Task:
@@ -85,8 +88,8 @@ class Scheduler:
 
     def build_plan(self) -> None:
         """
-        Retrieve all tasks from the owner's pets, sort by priority (high first),
-        then greedily fill the time budget. Incomplete tasks only.
+        Sort pending tasks by frequency (daily first), then priority (high first),
+        then duration (shortest first as tiebreaker). Greedily fill the time budget.
         """
         self.scheduled_tasks = []
         self.skipped_tasks = []
@@ -94,8 +97,11 @@ class Scheduler:
         all_tasks = self.owner.get_all_tasks()
         pending = [t for t in all_tasks if not t.completed]
         pending.sort(
-            key=lambda t: PRIORITY_LEVELS.get(t.priority, 0),
-            reverse=True,
+            key=lambda t: (
+                FREQUENCY_ORDER.get(t.frequency, 99),   # daily before weekly/as-needed
+                -PRIORITY_LEVELS.get(t.priority, 0),    # high priority before low
+                t.duration_minutes,                      # shorter tasks break ties
+            )
         )
 
         time_remaining = self.owner.get_available_time()
@@ -105,6 +111,60 @@ class Scheduler:
                 time_remaining -= task.duration_minutes
             else:
                 self.skipped_tasks.append(task)
+
+    def filter_scheduled(
+        self,
+        pet_name: str | None = None,
+        completed: bool | None = None,
+        category: str | None = None,
+    ) -> list[Task]:
+        """Return scheduled tasks filtered by pet name, completion status, or category."""
+        # Build a lookup so we can match tasks back to their pet
+        task_to_pet: dict[int, str] = {}
+        for pet in self.owner.pets:
+            for task in pet.get_tasks():
+                task_to_pet[id(task)] = pet.name
+
+        results = self.scheduled_tasks
+        if pet_name is not None:
+            results = [t for t in results if task_to_pet.get(id(t)) == pet_name]
+        if completed is not None:
+            results = [t for t in results if t.completed == completed]
+        if category is not None:
+            results = [t for t in results if t.category == category]
+        return results
+
+    def detect_conflicts(self) -> list[str]:
+        """
+        Scan for scheduling problems and return a list of plain-language warnings.
+
+        Checks:
+        - Duplicate task titles assigned to the same pet.
+        - Total daily-task time exceeding the owner's available minutes.
+        """
+        warnings: list[str] = []
+
+        # 1. Duplicate task titles per pet
+        for pet in self.owner.pets:
+            seen: set[str] = set()
+            for task in pet.get_tasks():
+                if task.title in seen:
+                    warnings.append(
+                        f"Conflict: '{task.title}' is listed more than once for {pet.name}."
+                    )
+                seen.add(task.title)
+
+        # 2. Daily tasks alone exceed the available time budget
+        all_tasks = self.owner.get_all_tasks()
+        daily_total = sum(t.duration_minutes for t in all_tasks if t.frequency == "daily")
+        budget = self.owner.get_available_time()
+        if daily_total > budget:
+            warnings.append(
+                f"Time overload: daily tasks total {daily_total} min but only "
+                f"{budget} min are available. Some daily tasks will be skipped."
+            )
+
+        return warnings
 
     def get_skipped_tasks(self) -> list[Task]:
         """Return tasks that did not fit within the available time budget."""
