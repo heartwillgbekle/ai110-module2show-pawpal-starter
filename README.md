@@ -22,6 +22,23 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## Smarter Scheduling
+
+The scheduling logic in `pawpal_system.py` goes beyond a simple list of tasks. Four algorithms make it more intelligent:
+
+**Frequency-aware sorting** — Tasks are sorted before scheduling using a three-key sort: frequency first (`daily` → `weekly` → `as-needed`), then priority (`high` → `low`), then duration (shortest first as a tiebreaker). This ensures a dog's daily medication is always considered before a weekly grooming session, regardless of how tasks were added.
+
+**Time-based sorting** — `Scheduler.sort_by_time()` orders the scheduled plan by each task's preferred start time (`HH:MM`). Because the strings are zero-padded, lexicographic order equals chronological order — no date parsing required. Tasks without a start time sort to the end.
+
+**Filtering** — `Scheduler.filter_scheduled()` accepts any combination of `pet_name`, `completed`, and `category` to return a focused subset of the scheduled plan. Filters can be stacked: e.g., all incomplete feed tasks for a specific pet.
+
+**Conflict detection** — `Scheduler.detect_conflicts()` runs three checks and returns plain-language warnings without crashing the program:
+- Duplicate task titles (among incomplete tasks) for the same pet
+- Daily-task total exceeding the owner's available time budget
+- Overlapping time windows between any two scheduled tasks, using interval arithmetic (`start_A < end_B and start_B < end_A`)
+
+**Recurring tasks** — Calling `Pet.complete_task(title)` marks a task done and automatically appends the next occurrence to the pet's task list. Daily tasks recur tomorrow (`timedelta(days=1)`), weekly tasks recur in seven days (`timedelta(days=7)`), and as-needed tasks do not recur.
+
 ## Getting started
 
 ### Setup

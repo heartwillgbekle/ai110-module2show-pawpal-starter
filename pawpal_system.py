@@ -128,6 +128,7 @@ class Owner:
 
 class Scheduler:
     def __init__(self, owner: Owner):
+        """Initialise the scheduler with an Owner whose pets and tasks drive the plan."""
         self.owner = owner
         self.scheduled_tasks: list[Task] = []
         self.skipped_tasks: list[Task] = []
@@ -227,16 +228,16 @@ class Scheduler:
         # cleaner than a manual index-guard nested loop.
         timed = [t for t in self.scheduled_tasks if t.scheduled_time is not None]
         for a, b in combinations(timed, 2):
-                start_a = self._to_minutes(a.scheduled_time)
-                start_b = self._to_minutes(b.scheduled_time)
-                end_a = start_a + a.duration_minutes
-                end_b = start_b + b.duration_minutes
-                if start_a < end_b and start_b < end_a:
-                    warnings.append(
-                        f"Time conflict: '{a.title}' ({a.scheduled_time}, "
-                        f"{a.duration_minutes} min) overlaps with "
-                        f"'{b.title}' ({b.scheduled_time}, {b.duration_minutes} min)."
-                    )
+            start_a = self._to_minutes(a.scheduled_time)
+            start_b = self._to_minutes(b.scheduled_time)
+            end_a = start_a + a.duration_minutes
+            end_b = start_b + b.duration_minutes
+            if start_a < end_b and start_b < end_a:
+                warnings.append(
+                    f"Time conflict: '{a.title}' ({a.scheduled_time}, "
+                    f"{a.duration_minutes} min) overlaps with "
+                    f"'{b.title}' ({b.scheduled_time}, {b.duration_minutes} min)."
+                )
 
         return warnings
 
