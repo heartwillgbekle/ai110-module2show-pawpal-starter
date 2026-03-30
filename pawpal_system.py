@@ -179,18 +179,26 @@ class Scheduler:
             results = [t for t in results if t.category == category]
         return results
 
+    @staticmethod
+    def _to_minutes(time_str: str) -> int:
+        """Convert a 'HH:MM' string to total minutes since midnight."""
+        h, m = time_str.split(":")
+        return int(h) * 60 + int(m)
+
     def detect_conflicts(self) -> list[str]:
         """
-        Scan for scheduling problems and return a list of plain-language warnings.
+        Scan for scheduling problems and return plain-language warnings.
 
         Checks:
-        - Duplicate task titles assigned to the same pet.
-        - Total daily-task time exceeding the owner's available minutes.
+        1. Duplicate task titles (incomplete tasks) per pet.
+        2. Daily-task total exceeds the available time budget.
+        3. Overlapping time windows in the current scheduled plan.
+           Two tasks overlap when one starts before the other finishes:
+               start_A < end_B  AND  start_B < end_A
         """
         warnings: list[str] = []
 
         # 1. Duplicate task titles among INCOMPLETE tasks per pet
-        # (a completed task alongside its auto-created next occurrence is normal)
         for pet in self.owner.pets:
             seen: set[str] = set()
             for task in pet.get_tasks():
@@ -211,6 +219,22 @@ class Scheduler:
                 f"Time overload: daily tasks total {daily_total} min but only "
                 f"{budget} min are available. Some daily tasks will be skipped."
             )
+
+        # 3. Overlapping time windows in the scheduled plan
+        # Only tasks that have a scheduled_time can be compared.
+        timed = [t for t in self.scheduled_tasks if t.scheduled_time is not None]
+        for i, a in enumerate(timed):
+            for b in timed[i + 1:]:
+                start_a = self._to_minutes(a.scheduled_time)
+                start_b = self._to_minutes(b.scheduled_time)
+                end_a = start_a + a.duration_minutes
+                end_b = start_b + b.duration_minutes
+                if start_a < end_b and start_b < end_a:
+                    warnings.append(
+                        f"Time conflict: '{a.title}' ({a.scheduled_time}, "
+                        f"{a.duration_minutes} min) overlaps with "
+                        f"'{b.title}' ({b.scheduled_time}, {b.duration_minutes} min)."
+                    )
 
         return warnings
 
