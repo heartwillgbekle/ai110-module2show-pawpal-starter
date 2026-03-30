@@ -14,9 +14,11 @@ class Task:
     completed: bool = False
 
     def mark_complete(self) -> None:
+        """Mark this task as completed."""
         self.completed = True
 
     def is_high_priority(self) -> bool:
+        """Return True if the task's priority is high."""
         return self.priority == "high"
 
 
@@ -28,15 +30,19 @@ class Pet:
     tasks: list[Task] = field(default_factory=list)
 
     def add_task(self, task: Task) -> None:
+        """Append a task to this pet's task list."""
         self.tasks.append(task)
 
     def remove_task(self, title: str) -> None:
+        """Remove all tasks matching the given title."""
         self.tasks = [t for t in self.tasks if t.title != title]
 
     def get_tasks(self) -> list[Task]:
+        """Return the pet's full task list."""
         return self.tasks
 
     def get_profile(self) -> str:
+        """Return a one-line summary of the pet's profile and task count."""
         return f"{self.name} ({self.species}, age {self.age}) — {len(self.tasks)} task(s)"
 
 
@@ -48,9 +54,11 @@ class Owner:
     pets: list[Pet] = field(default_factory=list)
 
     def add_pet(self, pet: Pet) -> None:
+        """Add a pet to the owner's pet list."""
         self.pets.append(pet)
 
     def remove_pet(self, name: str) -> None:
+        """Remove all pets matching the given name."""
         self.pets = [p for p in self.pets if p.name != name]
 
     def get_all_tasks(self) -> list[Task]:
@@ -61,9 +69,11 @@ class Owner:
         return all_tasks
 
     def get_available_time(self) -> int:
+        """Return the number of minutes the owner has available today."""
         return self.available_minutes
 
     def update_preferences(self, pref: str) -> None:
+        """Update the owner's care preferences."""
         self.preferences = pref
 
 
@@ -97,6 +107,7 @@ class Scheduler:
                 self.skipped_tasks.append(task)
 
     def get_skipped_tasks(self) -> list[Task]:
+        """Return tasks that did not fit within the available time budget."""
         return self.skipped_tasks
 
     def explain_plan(self) -> str:
