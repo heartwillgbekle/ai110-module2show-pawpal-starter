@@ -1,5 +1,7 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
+
+PRIORITY_LEVELS = {"low": 1, "medium": 2, "high": 3}
 
 
 @dataclass
@@ -20,7 +22,6 @@ class Pet:
     name: str
     species: str
     age: int
-    owner: Owner
 
     def get_profile(self) -> str:
         pass

@@ -12,13 +12,11 @@
 
 3. **Generate and view a daily schedule** — A user requests a daily plan and the app arranges tasks within the available time window based on priority and constraints, then displays the ordered schedule along with an explanation of why each task was included or left out.
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+The initial design uses four classes. `Owner` holds the pet owner's name, daily time budget, and care preferences — it is the source of the constraint that the scheduler works within. `Pet` holds profile info (name, species, age) that describes who is being cared for. `Task` represents a single care activity and carries the title, duration, priority, category, and completion status needed to make scheduling decisions. `Scheduler` is the core logic class: it holds the owner, the pet, and the full task list, then produces two output lists — scheduled tasks that fit within the time budget and skipped tasks that did not — along with a plain-language explanation of the plan.
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
+After reviewing the skeleton, three changes were made. First, `Pet.owner` was removed as an attribute. The original UML gave `Pet` a back-reference to `Owner`, but `Scheduler` already holds `Owner` directly, making the link on `Pet` redundant and potentially confusing. Second, a `PRIORITY_LEVELS` constant (`{"low": 1, "medium": 2, "high": 3}`) was added at the module level. Because `priority` is stored as a plain string, `build_plan()` needs a consistent numeric mapping to sort and compare tasks — without it, string comparisons like `"high" > "low"` would be unreliable. Third, the unused `field` import from `dataclasses` was removed to keep the module clean. One potential bottleneck was also noted but left for the logic phase: when two tasks share the same priority level there is currently no tiebreaker, so `build_plan()` will need a secondary sort key (such as duration or category) to produce a deterministic schedule.
 
 ---
 
