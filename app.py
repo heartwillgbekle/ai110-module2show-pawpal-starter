@@ -28,9 +28,6 @@ st.divider()
 
 # ---------------------------------------------------------------------------
 # Section 2: Add a pet
-# Submitting this form calls owner.add_pet(), which stores the new Pet inside
-# the Owner object in session state. Streamlit reruns after submit, so the
-# updated owner.pets list is immediately reflected in the pet selector below.
 # ---------------------------------------------------------------------------
 st.subheader("Add a Pet")
 with st.form("add_pet_form", clear_on_submit=True):
@@ -57,10 +54,7 @@ if owner.pets:
 st.divider()
 
 # ---------------------------------------------------------------------------
-# Section 3: Add a task to a specific pet
-# The user picks which pet gets the task from a dropdown built from
-# owner.pets. On submit, pet.add_task() is called directly on the chosen
-# Pet object stored inside the Owner — no syncing needed.
+# Section 3: Add a task
 # ---------------------------------------------------------------------------
 st.subheader("Add a Task")
 
@@ -77,20 +71,23 @@ else:
             duration = st.number_input("Duration (min)", min_value=1, max_value=240, value=20)
         with col3:
             priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
-        col4, col5 = st.columns(2)
+        col4, col5, col6 = st.columns(3)
         with col4:
             category = st.selectbox("Category", ["walk", "feed", "meds", "grooming", "enrichment"])
         with col5:
             frequency = st.selectbox("Frequency", ["daily", "weekly", "as-needed"])
+        with col6:
+            scheduled_time = st.text_input("Start time (HH:MM)", value="", placeholder="07:00")
         task_submitted = st.form_submit_button("Add task")
 
     if task_submitted:
-        # Retrieve the exact Pet object from owner.pets and call add_task() on it
         target_pet = next(p for p in owner.pets if p.name == selected_pet_name)
-        target_pet.add_task(Task(task_title, int(duration), priority, category, frequency))
+        target_pet.add_task(Task(
+            task_title, int(duration), priority, category, frequency,
+            scheduled_time=scheduled_time.strip() or None,
+        ))
         st.success(f"Added '{task_title}' to {selected_pet_name}'s tasks.")
 
-    # Show all tasks grouped by pet
     for pet in owner.pets:
         tasks = pet.get_tasks()
         if tasks:
@@ -98,11 +95,12 @@ else:
             st.table([
                 {
                     "Title": t.title,
+                    "Start": t.scheduled_time or "—",
                     "Duration (min)": t.duration_minutes,
                     "Priority": t.priority,
                     "Category": t.category,
                     "Frequency": t.frequency,
-                    "Done": t.completed,
+                    "Done": "Yes" if t.completed else "No",
                 }
                 for t in tasks
             ])
@@ -111,9 +109,6 @@ st.divider()
 
 # ---------------------------------------------------------------------------
 # Section 4: Generate schedule
-# Scheduler.build_plan() pulls all tasks from owner.get_all_tasks(), which
-# aggregates across every pet. The result is stored in session state so the
-# plan stays visible even after subsequent reruns.
 # ---------------------------------------------------------------------------
 st.subheader("Build Schedule")
 
@@ -124,6 +119,83 @@ if st.button("Generate schedule", disabled=not owner.pets):
 
 if "scheduler" in st.session_state:
     s: Scheduler = st.session_state.scheduler
-    st.code(s.display_plan(), language=None)
-    with st.expander("Why these tasks?"):
+
+    # --- Conflict warnings ------------------------------------------------
+    # Shown before the plan so the owner can fix issues before acting on it.
+    # Time conflicts get st.warning (actionable but not blocking).
+    # Time overload gets st.error (more severe — daily tasks won't all fit).
+    conflicts = s.detect_conflicts()
+    if conflicts:
+        st.markdown("#### Scheduling Alerts")
+        for msg in conflicts:
+            if "overload" in msg.lower():
+                st.error(f"🚨 {msg}")
+            else:
+                st.warning(f"⚠️ {msg}")
+    else:
+        st.success("No conflicts detected — your schedule looks clean!")
+
+    # --- Sorted schedule table --------------------------------------------
+    st.markdown("#### Today's Schedule")
+
+    # Filter controls — let the owner focus on one pet or category
+    col1, col2 = st.columns(2)
+    with col1:
+        filter_pet = st.selectbox(
+            "Filter by pet",
+            ["All"] + [p.name for p in owner.pets],
+            key="filter_pet",
+        )
+    with col2:
+        filter_cat = st.selectbox(
+            "Filter by category",
+            ["All", "walk", "feed", "meds", "grooming", "enrichment"],
+            key="filter_cat",
+        )
+
+    sorted_tasks = s.sort_by_time()
+
+    # Apply filters using filter_scheduled on the scheduler, then intersect
+    # with the sort order so chronological order is preserved.
+    filtered = s.filter_scheduled(
+        pet_name=filter_pet if filter_pet != "All" else None,
+        category=filter_cat if filter_cat != "All" else None,
+    )
+    filtered_ids = {id(t) for t in filtered}
+    display_tasks = [t for t in sorted_tasks if id(t) in filtered_ids]
+
+    if display_tasks:
+        total_shown = sum(t.duration_minutes for t in display_tasks)
+        st.caption(f"{len(display_tasks)} task(s) shown · {total_shown} min")
+        st.table([
+            {
+                "Start": t.scheduled_time or "—",
+                "Task": t.title,
+                "Duration (min)": t.duration_minutes,
+                "Priority": t.priority,
+                "Category": t.category,
+                "Frequency": t.frequency,
+                "Status": "Done" if t.completed else "Pending",
+            }
+            for t in display_tasks
+        ])
+    else:
+        st.info("No tasks match the current filters.")
+
+    # --- Skipped tasks ----------------------------------------------------
+    skipped = s.get_skipped_tasks()
+    if skipped:
+        with st.expander(f"Skipped tasks ({len(skipped)}) — didn't fit in the time budget"):
+            st.table([
+                {
+                    "Task": t.title,
+                    "Duration (min)": t.duration_minutes,
+                    "Priority": t.priority,
+                    "Frequency": t.frequency,
+                }
+                for t in skipped
+            ])
+
+    # --- Reasoning --------------------------------------------------------
+    with st.expander("Why were these tasks chosen?"):
         st.text(s.explain_plan())
